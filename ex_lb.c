@@ -12,6 +12,7 @@
 #define NUMBER_OF_SERVERS 3
 #define MIN_PORT_ADDRESS 1024
 #define MAX_PORT_ADDRESS 64000
+#define NULL_TERMINATOR '\0'
 #define SERVER_PORT_FILE "server_port"
 #define HTTP_PORT_FILE "http_port"
 #define HTTP_MESSAGE_SUFFIX "\r\n\r\n"
@@ -71,17 +72,78 @@ void accept_server_connections(int servers_listen_fd, struct sockaddr_in servers
     }   
 }
 
+void send_http_message_to_connection(int reciveing_fd, char *message_to_send,
+                                     int message_to_send_size_bytes)
+{
+    int bytes_sent, total_amount_of_bytes_sent = 0;
+     while((bytes_sent = send(reciveing_fd, message_to_send + total_amount_of_bytes_sent, 
+                              message_to_send_size_bytes - total_amount_of_bytes_sent, 0)) > 0){ 
+        total_amount_of_bytes_sent += bytes_sent;
+        if(total_amount_of_bytes_sent == message_to_send_size_bytes){
+            break;
+        }
+    }
+    if (bytes_sent == -1){
+        printf("Error: send failed: %s \n", strerror(errno));
+        //close connections and exit?
+    } else{
+        printf("didnt recv anything but also didng get a full request before?\n");
+        //close connections and exit?
+    }
+} 
+
+int get_http_message_from_connection(int connections_fd, char *http_message)
+{
+    int message_allocated_memory_size_bytes, message_size_bytes, bytes_read; 
+    char message_read_buffer[MESSAGE_SIZE]; 
+    message_read_buffer[MESSAGE_SIZE - 1] = NULL_TERMINATOR; // minus 1 may cause issues
+    message_allocated_memory_size_bytes = MESSAGE_SIZE;
+    message_size_bytes = 0; 
+    bytes_read = recv(connections_fd, message_read_buffer, MESSAGE_SIZE - 1, 0); // minus 1 may cause issues
+    while(bytes_read > 0){
+        message_size_bytes += bytes_read;
+        if(message_size_bytes > message_allocated_memory_size_bytes){
+            http_message = (char *) realloc(http_message, 
+                                            message_allocated_memory_size_bytes + MESSAGE_SIZE);
+            message_allocated_memory_size_bytes += MESSAGE_SIZE;
+        }
+        strncpy(http_message + message_size_bytes - bytes_read, message_read_buffer, bytes_read);
+        http_message[message_size_bytes] = NULL_TERMINATOR;
+        if(strstr(http_message, HTTP_MESSAGE_SUFFIX) != NULL){
+            return message_size_bytes;
+        }
+    }
+    if(bytes_read == -1){
+        printf("Error: recv failed: %s \n", strerror(errno));
+        return 0;
+        //close connections and exit?
+    }else{ 
+        printf("didnt recv anything but also didng get a full request before?\n");
+        return 0;
+        //close connections and exit?
+    }
+}
+
+int send_request_and_get_response(int number_processed_requests, int *connected_servers_fd, 
+                                  char *http_message, int message_size_bytes, char *http_response)
+{
+    int handling_server_fd, bytes_read; 
+    handling_server_fd = connected_servers_fd[number_processed_requests % NUMBER_OF_SERVERS];
+    send_http_message_to_connection(handling_server_fd, http_message, message_size_bytes);
+    bytes_read = get_http_message_from_connection(handling_server_fd, http_response); 
+    return bytes_read;
+
+}
+
 void accept_and_handle_browser_connection(int browser_listen_fd, socklen_t addrsize, 
                                           int *connected_servers_fd)
 {
     struct sockaddr_in browser_ip_addr;
 
-    char *http_message = malloc(MESSAGE_SIZE * sizeof(char)); //// will change later
-    http_message[MESSAGE_SIZE - 1] = '\0'; // minus 1 may cause issues
-    char *servers_message = malloc(MESSAGE_SIZE * sizeof(char)); //// will change later
-    servers_message[MESSAGE_SIZE - 1] = '\0'; // minus 1 may cause issues
-
-    int connected_browser_fd, message_size_bytes, bytes_read, number_processed_requests = 0;
+    char *http_request;
+    char *http_response;
+    int connected_browser_fd, request_message_size_bytes, 
+        response_message_size_bytes, number_processed_requests = -1;
     while(RUN_PROGRAM){
         // in operating systems class the accept was in the loop, but why here, same browser. but different
         // clients maybe ?
@@ -90,41 +152,20 @@ void accept_and_handle_browser_connection(int browser_listen_fd, socklen_t addrs
             printf("Error: accept with browser Failed: %s \n", strerror(errno));
             exit(EXIT_FAILURE);
         }
-        
-        message_size_bytes = 0; /*initilize for every new client*/  
-        while(RUN_PROGRAM){ 
-            bytes_read = recv(connected_browser_fd, http_message, MESSAGE_SIZE, 0);
-            message_size_bytes += bytes_read;
-            if((bytes_read > 0) && (bytes_read < MESSAGE_SIZE) && strstr(http_message, HTTP_MESSAGE_SUFFIX)){
-                http_message[bytes_read] = '\0';
-                //// here do something like:
-                // if got end of http request:
-                //  send http to clients
-                //  wait for responde
-                //  send responde back to browser
-                //  go back to reading from browser
-            }
-            
-            if(bytes_read == -1){
-                printf("Error: read failed: %s \n", strerror(errno));
-                close(connected_browser_fd);
-                close(connected_servers_fd);
-                exit(EXIT_FAILURE);
-            } else{ 
-                /*
-                bytes_read = 0
-                sprintf(servers_message, "%u", number_to_write_back); 
-                returned_message[num_digits] = '\0';
-                if((rc = write(connected_browser_fd, returned_message, num_digits)) == -1){ 
-                    printf("Error: failed to write back to client.\n");
-                    close(connected_browser_fd);
-                    close(connected_servers_fd);
-                    exit(EXIT_FAILURE);
-                }
-                */
-            }
-        }
-        //pass request to sever number: number_processed_requests % NUMBER_OF_SERVERS
+        http_request = (char *)malloc(MESSAGE_SIZE * sizeof(char)); 
+        http_request[MESSAGE_SIZE - 1] = NULL_TERMINATOR; // minus 1 may cause issues
+        request_message_size_bytes = get_http_message_from_connection(connected_browser_fd, http_request);
+        number_processed_requests++;
+
+        http_response = (char *)malloc(MESSAGE_SIZE * sizeof(char)); 
+        http_response[MESSAGE_SIZE - 1] = NULL_TERMINATOR; // minus 1 may cause issues
+        response_message_size_bytes = send_request_and_get_response(number_processed_requests, 
+                                                                    connected_servers_fd, http_request, 
+                                                                    request_message_size_bytes, 
+                                                                    http_response);
+        send_http_message_to_connection(connected_browser_fd, http_response, response_message_size_bytes);
+        free(http_request);
+        free(http_response);
     }
     close(connected_browser_fd);
 }
