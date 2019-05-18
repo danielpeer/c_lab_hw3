@@ -5,6 +5,8 @@
 #include <netdb.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <time.h>
+#include <unistd.h>
 
 #define MESSAGE_SIZE 4096
 #define MAX_NUMBER_OF_PENDING_CLIENT_CONNECTIONS 9
@@ -167,7 +169,7 @@ void accept_and_handle_browser_connection(int browser_listen_fd, socklen_t addrs
         free(http_request);
         free(http_response);
     }
-    close(connected_browser_fd);
+    close(connected_browser_fd); 
 }
 
 int main()
