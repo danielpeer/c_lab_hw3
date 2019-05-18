@@ -99,8 +99,7 @@ int get_http_message_from_connection(int connections_fd, char *http_message)
   message_read_buffer[MESSAGE_SIZE - 1] = NULL_TERMINATOR;  // minus 1 may cause issues
   message_allocated_memory_size_bytes = MESSAGE_SIZE;
   message_size_bytes = 0;
-  bytes_read = recv(connections_fd, message_read_buffer, MESSAGE_SIZE - 1, 0);  // minus 1 may cause issues
-  while (bytes_read > 0) {
+  while ((bytes_read = recv(connections_fd, message_read_buffer, MESSAGE_SIZE - 1, 0)) > 0) {
     message_size_bytes += bytes_read;
     if (message_size_bytes > message_allocated_memory_size_bytes) {
       http_message = (char *)realloc(http_message, message_allocated_memory_size_bytes + MESSAGE_SIZE);
