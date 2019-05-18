@@ -87,7 +87,7 @@ void send_http_message_to_connection(int reciveing_fd, char *message_to_send, in
     printf("Error: send failed: %s \n", strerror(errno));
     // close connections and exit?
   } else {
-    printf("didnt recv anything but also didng get a full request before?\n");
+    printf("bytes_sent=0 ,seems we allways get here.. it still sends everything.. so maybe try different loop\n");
     // close connections and exit?
   }
 }
@@ -159,8 +159,9 @@ void accept_and_handle_browser_connection(int browser_listen_fd, socklen_t addrs
     send_http_message_to_connection(connected_browser_fd, http_response, response_message_size_bytes);
     free(http_request);
     free(http_response);
+    close(connected_browser_fd);
   }
-  close(connected_browser_fd);
+  
 }
 
 int main()
