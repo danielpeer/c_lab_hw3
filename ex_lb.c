@@ -141,8 +141,6 @@ void accept_and_handle_browser_connection(int browser_listen_fd, socklen_t addrs
   char *http_response;
   int connected_browser_fd, request_message_size_bytes, response_message_size_bytes, number_processed_requests = -1;
   while (RUN_PROGRAM) {
-    // in operating systems class the accept was in the loop, but why here, same browser. but different
-    // clients maybe ?
     if ((connected_browser_fd = accept(browser_listen_fd, (struct sockaddr *)&browser_ip_addr, &addrsize)) < 0) {
       printf("Error: accept with browser Failed: %s \n", strerror(errno));
       exit(EXIT_FAILURE);
