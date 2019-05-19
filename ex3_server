@@ -1,0 +1,45 @@
+#! /usr/bin/python2.7 -tt
+import socket
+import sys
+
+message="HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s\r\n\r\n"
+address="/counter"
+match=1
+unmatch=0
+not_found=-1
+suffix_http_length=4
+buf_size=1024
+
+def find_get_index(lst) :
+    for index in range(len(lst)):
+        if lst[index] == "GET":
+            return index
+
+def process_http_request(http_requestm,counter):
+     lines_list = http_request.split("\r\n")
+     first_line_words=lines_list[0].split()
+     get_index = find_get_index(first_line_words)
+     if first_line_words[get_index+1] == address:
+         num_of_requests=str(counter+1)
+         s.send(message%(len(num_of_requests),num_of_requests))
+         return match
+     return unmatch
+    
+
+if __name__ == "__main__":
+    counter=0
+    total_data=""
+    s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    s.connect(('localhost',int(sys.argv[1])))
+    while (True):
+        data=s.recv(buf_size)
+        if(not data):
+            break
+        total_data+=data
+        find_http_index=total_data.find("\r\n\r\n")
+        if(find_http_index!=not_found):
+            http_request=total_data[:find_http_index+suffix_http_length]
+            total_data=total_data[find_http_index+suffix_http_length:]
+            counter+=process_http_request(http_request,counter)
+    s.close()
+
