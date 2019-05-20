@@ -1,9 +1,11 @@
-
 #! /usr/bin/python2.7 -tt
 import socket
 import sys
 
 MESSAGE = "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n%s\r\n\r\n"
+ERROR_MESSAGE="""HTTP/1.1 404 Not Found\r\nContent-type: text/html\r\nContent-length: 113
+\r\n\r\n<html><head><title>Not Found</title></head><body>\r\nSorry, the object you requested was not found.
+\r\n</body></html>\r\n\r\n"""
 ADDRESS = "/counter"
 MATCH = 1
 NO_MATCH = 0
@@ -15,16 +17,18 @@ def find_get_index(lst) :
     for index in range(len(lst)):
         if lst[index] == "GET":
             return index
+    return NOT_FOUND
 
-def process_http_request(http_requestm, requests_counter):
+def process_http_request(http_request, requests_counter):
      lines_list = http_request.split("\r\n")
      first_line_words=lines_list[0].split()
      get_index = find_get_index(first_line_words)
-     if first_line_words[get_index+1] == ADDRESS:
-         num_of_requests = str(requests_counter + 1)
-         s.send(MESSAGE%(len(num_of_requests),num_of_requests))
-         return MATCH
-     return NO_MATCH
+     if get_index == NOT_FOUND or first_line_words[get_index+1] != ADDRESS:
+         s.send(ERROR_MESSAGE)
+         return NO_MATCH
+     num_of_requests = str(requests_counter + 1)
+     s.send(MESSAGE%(len(num_of_requests),num_of_requests))
+     return MATCH
     
 
 if __name__ == "__main__":
