@@ -9,17 +9,21 @@
 #include <unistd.h>
 
 #define MESSAGE_SIZE 4096
-#define MAX_NUMBER_OF_PENDING_CLIENT_CONNECTIONS 9
+#define MAX_NUMBER_OF_PENDING_CLIENT_CONNECTIONS 10
 #define OFF 0
 #define ON 1
 #define ERROR_OCCURED -1
 #define NUMBER_OF_SERVERS 3
 #define MIN_PORT_ADDRESS 1024
 #define MAX_PORT_ADDRESS 64000
+#define SERVER 1
+#define BROWSER 0
 #define NULL_TERMINATOR '\0'
 #define SERVER_PORT_FILE "server_port"
 #define HTTP_PORT_FILE "http_port"
 #define HTTP_MESSAGE_SUFFIX "\r\n\r\n"
+#define HTTP_SUFFIX_NUMBER_IN_BROWSER_MESSAGE 1
+#define HTTP_SUFFIX_NUMBER_IN_SERVER_MESSAGE 2
 #define RUN_PROGRAM 1
 
 void set_socket_port_and_bind(struct sockaddr_in *lb_ip_addr, short unsigned int *port, int *listen_fd,
@@ -80,9 +84,20 @@ void send_http_message_to_connection(int reciveing_fd, char *message_to_send, in
   }
 }
 
-int get_http_message_from_connection(int connections_fd, char *http_message)
+int get_number_of_http_suffix_from_message(char *message)
 {
-  int message_allocated_memory_size_bytes, message_size_bytes, bytes_read;
+  int number_of_spotings = 0;
+  char *new_message_pointer = message;
+  while((new_message_pointer = strstr(new_message_pointer, HTTP_MESSAGE_SUFFIX)) != NULL){
+    new_message_pointer++;
+    number_of_spotings++;
+  }
+  return number_of_spotings;  
+}
+
+int get_http_message_from_connection(int connections_fd, char *http_message, int connection_type)
+{
+  int message_allocated_memory_size_bytes, message_size_bytes, bytes_read, number_of_http_suffix = 0;
   char message_read_buffer[MESSAGE_SIZE];
   message_read_buffer[MESSAGE_SIZE - 1] = NULL_TERMINATOR;
   message_allocated_memory_size_bytes = MESSAGE_SIZE;
@@ -95,9 +110,11 @@ int get_http_message_from_connection(int connections_fd, char *http_message)
     }
     strncpy(http_message + message_size_bytes - bytes_read, message_read_buffer, bytes_read);
     http_message[message_size_bytes] = NULL_TERMINATOR;
-    if (strstr(http_message, HTTP_MESSAGE_SUFFIX) != NULL) {
-      return message_size_bytes;
-    }
+    number_of_http_suffix = get_number_of_http_suffix_from_message(http_message);
+    if((number_of_http_suffix == HTTP_SUFFIX_NUMBER_IN_BROWSER_MESSAGE && connection_type == BROWSER) || 
+       (number_of_http_suffix == HTTP_SUFFIX_NUMBER_IN_SERVER_MESSAGE && connection_type == SERVER)){
+         return message_size_bytes;
+       }
   }
   if (bytes_read == -1) {
     printf("Error: recv failed: %s \n", strerror(errno));
@@ -114,7 +131,7 @@ int send_request_and_get_response(int number_processed_requests, const int *conn
   int handling_server_fd, bytes_read;
   handling_server_fd = connected_servers_fd[number_processed_requests % NUMBER_OF_SERVERS];
   send_http_message_to_connection(handling_server_fd, http_message, message_size_bytes);
-  bytes_read = get_http_message_from_connection(handling_server_fd, http_response);
+  bytes_read = get_http_message_from_connection(handling_server_fd, http_response, SERVER);
   return bytes_read;
 }
 
@@ -127,7 +144,7 @@ void accept_and_handle_browser_connection(int browser_listen_fd, int *connected_
     connected_browser_fd = accept(browser_listen_fd, NULL, NULL);
     http_request = (char *)malloc(MESSAGE_SIZE * sizeof(char));
     http_request[MESSAGE_SIZE - 1] = NULL_TERMINATOR;
-    request_message_size_bytes = get_http_message_from_connection(connected_browser_fd, http_request);
+    request_message_size_bytes = get_http_message_from_connection(connected_browser_fd, http_request, BROWSER);
     number_processed_requests++;
 
     http_response = (char *)malloc(MESSAGE_SIZE * sizeof(char));
@@ -157,7 +174,8 @@ int main()
   short unsigned int server_port, http_port;
   int browser_listen_fd, servers_listen_fd;
   srand(time(NULL));
-  set_connection_credentials(&lb_ip_addr, &server_port, &servers_listen_fd, NUMBER_OF_SERVERS, SERVER_PORT_FILE);
+  set_connection_credentials(&lb_ip_addr, &server_port, &servers_listen_fd, MAX_NUMBER_OF_PENDING_CLIENT_CONNECTIONS, 
+                             SERVER_PORT_FILE);
   set_connection_credentials(&lb_ip_addr, &http_port, &browser_listen_fd, MAX_NUMBER_OF_PENDING_CLIENT_CONNECTIONS,
                              HTTP_PORT_FILE);
   accept_server_connections(servers_listen_fd, connected_servers_fd);
