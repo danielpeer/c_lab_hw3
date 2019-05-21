@@ -19,15 +19,27 @@ def find_get_index(lst) :
             return index
     return NOT_FOUND
 
+def send_message(message):
+    message_to_send_size_bytes = len(message)
+    total_amount_of_bytes_sent = 0
+    while (True):
+        bytes_sent = s.send(message)
+        if (bytes_sent<=0):
+            break
+        total_amount_of_bytes_sent += bytes_sent
+        if(total_amount_of_bytes_sent == message_to_send_size_bytes):
+            break
+        message=message[bytes_sent:]
+
 def process_http_request(http_request, requests_counter):
      lines_list = http_request.split("\r\n")
      first_line_words=lines_list[0].split()
      get_index = find_get_index(first_line_words)
      if get_index == NOT_FOUND or first_line_words[get_index+1] != ADDRESS:
-         s.send(ERROR_MESSAGE)
+         send_message(ERROR_MESSAGE)
          return NO_MATCH
      num_of_requests = str(requests_counter + 1)
-     s.send(MESSAGE%(len(num_of_requests),num_of_requests))
+     send_message(MESSAGE%(len(num_of_requests),num_of_requests))
      return MATCH
     
 
