@@ -35,7 +35,7 @@ void set_socket_port_and_bind(struct sockaddr_in *lb_ip_addr, short unsigned int
   (*lb_ip_addr).sin_family = AF_INET;
   (*lb_ip_addr).sin_addr.s_addr = htonl(INADDR_ANY);
   while (!successfull_bind_flag) {
-    (*port) = (rand() % (MAX_PORT_ADDRESS + MIN_PORT_ADDRESS + 1)) + MIN_PORT_ADDRESS;
+    (*port) = (rand() % (MAX_PORT_ADDRESS - MIN_PORT_ADDRESS + 1)) + MIN_PORT_ADDRESS;
     (*lb_ip_addr).sin_port = htons(*port);
     if (bind((*listen_fd), (struct sockaddr *)lb_ip_addr, addrsize) == 0) {
       successfull_bind_flag = ON;
@@ -88,11 +88,11 @@ int get_number_of_http_suffix_from_message(char *message)
 {
   int number_of_spotings = 0;
   char *new_message_pointer = message;
-  while((new_message_pointer = strstr(new_message_pointer, HTTP_MESSAGE_SUFFIX)) != NULL){
+  while ((new_message_pointer = strstr(new_message_pointer, HTTP_MESSAGE_SUFFIX)) != NULL) {
     new_message_pointer++;
     number_of_spotings++;
   }
-  return number_of_spotings;  
+  return number_of_spotings;
 }
 
 int get_http_message_from_connection(int connections_fd, char *http_message, int connection_type)
@@ -111,10 +111,10 @@ int get_http_message_from_connection(int connections_fd, char *http_message, int
     strncpy(http_message + message_size_bytes - bytes_read, message_read_buffer, bytes_read);
     http_message[message_size_bytes] = NULL_TERMINATOR;
     number_of_http_suffix = get_number_of_http_suffix_from_message(http_message);
-    if((number_of_http_suffix == HTTP_SUFFIX_NUMBER_IN_BROWSER_MESSAGE && connection_type == BROWSER) || 
-       (number_of_http_suffix == HTTP_SUFFIX_NUMBER_IN_SERVER_MESSAGE && connection_type == SERVER)){
-         return message_size_bytes;
-       }
+    if ((number_of_http_suffix == HTTP_SUFFIX_NUMBER_IN_BROWSER_MESSAGE && connection_type == BROWSER) ||
+        (number_of_http_suffix == HTTP_SUFFIX_NUMBER_IN_SERVER_MESSAGE && connection_type == SERVER)) {
+      return message_size_bytes;
+    }
   }
   if (bytes_read == -1) {
     printf("Error: recv failed: %s \n", strerror(errno));
@@ -139,19 +139,18 @@ void accept_and_handle_browser_connection(int browser_listen_fd, int *connected_
 {
   char *http_request;
   char *http_response;
-  int connected_browser_fd, response_message_size_bytes, request_message_size_bytes, number_processed_requests = -1;
+  int connected_browser_fd, response_message_size_bytes, request_message_size_bytes, number_processed_requests = 0;
   while (RUN_PROGRAM) {
     connected_browser_fd = accept(browser_listen_fd, NULL, NULL);
     http_request = (char *)malloc(MESSAGE_SIZE * sizeof(char));
     http_request[MESSAGE_SIZE - 1] = NULL_TERMINATOR;
     request_message_size_bytes = get_http_message_from_connection(connected_browser_fd, http_request, BROWSER);
-    number_processed_requests++;
-
     http_response = (char *)malloc(MESSAGE_SIZE * sizeof(char));
     http_response[MESSAGE_SIZE - 1] = NULL_TERMINATOR;
     response_message_size_bytes = send_request_and_get_response(
         number_processed_requests, connected_servers_fd, http_request, request_message_size_bytes, http_response);
     send_http_message_to_connection(connected_browser_fd, http_response, response_message_size_bytes);
+    number_processed_requests++;
     free(http_request);
     free(http_response);
     close(connected_browser_fd);
@@ -174,7 +173,7 @@ int main()
   short unsigned int server_port, http_port;
   int browser_listen_fd, servers_listen_fd;
   srand(time(NULL));
-  set_connection_credentials(&lb_ip_addr, &server_port, &servers_listen_fd, MAX_NUMBER_OF_PENDING_CLIENT_CONNECTIONS, 
+  set_connection_credentials(&lb_ip_addr, &server_port, &servers_listen_fd, MAX_NUMBER_OF_PENDING_CLIENT_CONNECTIONS,
                              SERVER_PORT_FILE);
   set_connection_credentials(&lb_ip_addr, &http_port, &browser_listen_fd, MAX_NUMBER_OF_PENDING_CLIENT_CONNECTIONS,
                              HTTP_PORT_FILE);
